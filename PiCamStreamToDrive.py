@@ -31,7 +31,7 @@ def capture_and_upload():
         credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         drive_service = build('drive', 'v3', credentials=credentials)
         
-        folder_id = 'your_folder_id'  # Replace with the ID of your Google Drive folder
+        folder_id = '156IGCZgavLZQr7NdwST1yXZM6w2oZwgP'  # Replace with the ID of your Google Drive folder
         file_metadata = {
             'name': image_path,
             'parents': [folder_id]
