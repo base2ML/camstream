@@ -45,6 +45,8 @@ def capture_images():
 
             # Save the captured image to a file (in BMP format)
             pygame.image.save(img, image_path)
+            
+            print("Image saved at:", image_path)  # Print the image path
 
             image_counter += 1
 
