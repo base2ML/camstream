@@ -1,4 +1,10 @@
 {
   "folder_id": "156IGCZgavLZQr7NdwST1yXZM6w2oZwgP",
-  "fps": 15 
+  "fps": 5,
+  "capture_fps" : 5,
+  "upload_fps" : 5,
+  "local_path" : "C:\\users\\cwl21\\onedrive\\desktop\\camstream",
+  "image_folder" : "C:\\users\\cwl21\\onedrive\\desktop\\camstream\\images",
+  "folder_path" : "C:\\users\\cwl21\\onedrive\\desktop\\camstream\\images\\",
+  "bucket_name" : "camstream"
 }
