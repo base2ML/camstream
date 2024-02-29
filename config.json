@@ -1,8 +1,8 @@
 {
   "folder_id": "156IGCZgavLZQr7NdwST1yXZM6w2oZwgP",
-  "fps": 5,
-  "capture_fps": 5,
-  "upload_fps": 5,
+  "fps": 25,
+  "capture_fps": 25,
+  "upload_fps": 25,
   "local_path": "camstream",
   "image_folder": "camstream/images",
   "folder_path": "camstream/images/",
