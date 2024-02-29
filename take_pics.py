@@ -10,7 +10,7 @@ config = {
 
 # Global variables
 image_counter = 0
-fps = config.get('fps', 10)
+fps = config.get('fps', 25)
 
 # Function to capture images
 def capture_images():
