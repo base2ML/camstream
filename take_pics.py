@@ -1,6 +1,5 @@
 import os
 import pygame.camera
-import pygame.image
 import time
 from datetime import datetime
 
@@ -33,25 +32,30 @@ def capture_images():
     # Initialize the camera
     camera.start()
 
-    while True:
-        # Capture an image
-        img = camera.get_image()
+    try:
+        while True:
+            # Capture an image
+            img = camera.get_image()
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        folder_path = os.path.join(config['image_folder'], timestamp)  # Create folder path
-        os.makedirs(folder_path, exist_ok=True)  # Create folder if not exists
-        
-        image_path = os.path.join(folder_path, f'webcam_image_{timestamp}_{image_counter}.jpg')
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+            folder_path = os.path.join(config['image_folder'], timestamp)  # Create folder path
+            os.makedirs(folder_path, exist_ok=True)  # Create folder if not exists
+            
+            image_path = os.path.join(folder_path, f'webcam_image_{timestamp}_{image_counter}.bmp')
 
-        # Save the captured image to a file
-        pygame.image.save(img, image_path)
+            # Save the captured image to a file (in BMP format)
+            pygame.image.save(img, image_path)
 
-        image_counter += 1
+            image_counter += 1
 
-        time.sleep(1 / fps)  # Adjust for specified FPS
+            time.sleep(1 / fps)  # Adjust for specified FPS
 
-    # Stop the camera when done
-    camera.stop()
+    except KeyboardInterrupt:
+        print("Script stopped by user")
+
+    finally:
+        # Stop the camera when done
+        camera.stop()
 
 # Start capturing images
 capture_images()
