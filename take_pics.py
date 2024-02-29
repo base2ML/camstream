@@ -50,8 +50,6 @@ def capture_images():
 
             image_counter += 1
 
-            time.sleep(1 / fps)  # Adjust for specified FPS
-
     except KeyboardInterrupt:
         print("Script stopped by user")
 
