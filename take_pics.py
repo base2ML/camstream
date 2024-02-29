@@ -1,5 +1,6 @@
 import os
-import cv2
+import pygame.camera
+import pygame.image
 import time
 from datetime import datetime
 
@@ -15,26 +16,42 @@ fps = config.get('fps', 10)
 # Function to capture images
 def capture_images():
     global image_counter
-    cap = cv2.VideoCapture(0)  # Open webcam
+
+    # Initialize Pygame
+    pygame.init()
+    pygame.camera.init()
+
+    # Get the list of available cameras
+    camera_list = pygame.camera.list_cameras()
+    if not camera_list:
+        print("No cameras found")
+        return
+
+    # Use the first camera in the list (change index if needed)
+    camera = pygame.camera.Camera(camera_list[0])
+
+    # Initialize the camera
+    camera.start()
+
     while True:
-        ret, frame = cap.read()  # Read frame from webcam
-        if not ret:
-            print("Failed to capture image from webcam")
-            continue
-        
+        # Capture an image
+        img = camera.get_image()
+
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         folder_path = os.path.join(config['image_folder'], timestamp)  # Create folder path
         os.makedirs(folder_path, exist_ok=True)  # Create folder if not exists
         
         image_path = os.path.join(folder_path, f'webcam_image_{timestamp}_{image_counter}.jpg')
-        cv2.imwrite(image_path, frame)  # Save image
-        
+
+        # Save the captured image to a file
+        pygame.image.save(img, image_path)
+
         image_counter += 1
-        
+
         time.sleep(1 / fps)  # Adjust for specified FPS
 
-    # Release the VideoCapture object when done
-    cap.release()
+    # Stop the camera when done
+    camera.stop()
 
 # Start capturing images
 capture_images()
