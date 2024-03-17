@@ -1,73 +1,61 @@
-import logging
-from multiprocessing import Pool
-from picamera import PiCamera
-from io import BytesIO
-from PIL import Image, ImageEnhance, ImageFilter
+import picamera
+import time
+from PIL import Image, ImageEnhance
 import pytesseract
 import re
-import os
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def capture_image(filename):
+    """Captures an image to the specified filename."""
+    with picamera.PiCamera() as camera:
+        camera.resolution = (1024, 768)
+        time.sleep(2)  # Camera warm-up time
+        camera.capture(filename)
 
-# Preprocessing options (easily tweakable)
-PREPROCESS_GRAYSCALE = True
-CONTRAST_ENHANCEMENT = 1.5  # Set to 1 for no enhancement
-SHARPNESS_ENHANCEMENT = 1.0  # Set to 1 for no enhancement
-
-# OCR function to process an image
-def process_image(image_data):
+def process_image(filename):
+    """Preprocesses the image and performs OCR."""
     try:
-        image = Image.open(BytesIO(image_data))
-        
-        # Preprocess the image
-        if PREPROCESS_GRAYSCALE:
-            image = image.convert('L')
-        if CONTRAST_ENHANCEMENT != 1:
-            enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(CONTRAST_ENHANCEMENT)
-        if SHARPNESS_ENHANCEMENT != 1:
-            enhancer = ImageEnhance.Sharpness(image)
-            image = enhancer.enhance(SHARPNESS_ENHANCEMENT)
-        
-        text = pytesseract.image_to_string(image)
-        # Filter text based on your criteria
-        valid_texts = re.findall(r'\b[A-Z0-9]{3,10}\b', text)
-        return valid_texts
+        # Load the image
+        with Image.open(filename) as img:
+            # Preprocess (optional)
+            # Convert to grayscale
+            img = img.convert('L')
+            # Enhance contrast
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(2.0)  # Adjust contrast factor as needed
+
+            # Perform OCR
+            text = pytesseract.image_to_string(img)
+            return text
     except Exception as e:
-        logging.error(f"Error processing image: {e}")
-        return []
+        print(f"Error processing image: {e}")
+        return ""
 
-# Function to take a picture and process it
-def capture_and_process(camera):
-    stream = BytesIO()
-    camera.capture(stream, format='jpeg')
-    stream.seek(0)
-    texts = process_image(stream.getvalue())
-    if texts:
-        logging.info(f"Found texts: {texts}")
-    else:
-        # No valid text found; option to delete the image here
-        logging.info("No valid text found in the image.")
+def extract_valid_text(text):
+    """Extracts valid text based on specific criteria."""
+    # Criteria: Uppercase letters and/or numbers, length between 3 and 10 characters
+    valid_texts = re.findall(r'\b[A-Z0-9]{3,10}\b', text)
+    return valid_texts
 
-# Main function to setup camera and multiprocessing
 def main():
-    camera = PiCamera()
-    camera.resolution = (1024, 768)
+    image_filename = 'test_image.jpg'
+    
+    # Step 1: Capture image
+    capture_image(image_filename)
+    print("Image captured successfully.")
 
-    # Setup multiprocessing pool based on the number of cores
-    pool = Pool()  # Automatically uses all available cores
+    # Step 2: Process image
+    text = process_image(image_filename)
+    if text:
+        print("OCR Text:", text)
+        
+        # Step 3: Extract valid texts
+        valid_texts = extract_valid_text(text)
+        if valid_texts:
+            print("Valid Texts Found:", valid_texts)
+        else:
+            print("No valid texts match the criteria.")
+    else:
+        print("No text found in image.")
 
-    try:
-        while True:
-            # Using apply_async to not block the script while waiting for the process to finish
-            pool.apply_async(capture_and_process, args=(camera,))
-    except KeyboardInterrupt:
-        logging.info("Stopping by user request.")
-    finally:
-        pool.close()
-        pool.join()
-        camera.close()
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
