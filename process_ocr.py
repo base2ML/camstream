@@ -1,52 +1,23 @@
-import io
-import time
-import numpy as np
-import cv2
-from picamera import PiCamera
-from multiprocessing import Process, Queue
+from picamera2 import Picamera2
+from picamera2.previews import Preview
 
-def capture_images(queue):
-    with PiCamera() as camera:
-        camera.resolution = (1024, 768)
-        time.sleep(2)  # Camera warm-up time
-        
-        for _ in range(10):  # Capture 10 images for demonstration
-            stream = io.BytesIO()
-            camera.capture(stream, format='jpeg')
-            stream.seek(0)
-            queue.put(stream.getvalue())  # Put image data into the queue
-            time.sleep(1)
-    
-    queue.put(None)  # Signal that capturing is done
+# Initialize Picamera2
+picam2 = Picamera2()
 
-def process_images(queue):
-    while True:
-        image_data = queue.get()
-        if image_data is None:
-            break  # Stop if capturing is done
-        
-        # Convert bytes to numpy array and then to OpenCV image
-        nparr = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+# Prepare the camera configuration
+config = picam2.create_still_configuration()
 
-        # Placeholder for processing logic
-        # Display the image for demonstration
-        cv2.imshow('Image', img)
-        cv2.waitKey(1000)  # Wait for 1 sec
+# Start the camera with the configuration
+picam2.start_and_configure(config)
 
-    cv2.destroyAllWindows()
+# Optionally, start a preview if you're connected to a display
+preview = Preview(picam2)
+preview.start()
 
-if __name__ == '__main__':
-    queue = Queue()
+# Capture and save an image
+picam2.capture_file("captured_image.jpg")
 
-    # Start the image capture process
-    capture_process = Process(target=capture_images, args=(queue,))
-    capture_process.start()
+# Stop the preview if it was started
+preview.stop()
 
-    # Start the image processing process
-    process_process = Process(target=process_images, args=(queue,))
-    process_process.start()
-
-    # Wait for processes to finish
-    capture_process.join()
-    process_process.join()
+print("Image captured successfully as 'captured_image.jpg'")
