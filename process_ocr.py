@@ -1,65 +1,52 @@
+import io
+import time
+import numpy as np
 import cv2
-import pytesseract
-from pytesseract import Output
-import re
+from picamera import PiCamera
+from multiprocessing import Process, Queue
 
-def capture_image():
-    """Captures an image from the camera and returns it."""
-    cap = cv2.VideoCapture(0)  # Initialize the camera
-    if not cap.isOpened():
-        print("Error: Could not open camera.")
-        return None
-    
-    # Capture a single frame
-    ret, frame = cap.read()
-    cap.release()  # Release the camera
-    if not ret:
-        print("Error: Could not read frame.")
-        return None
-    
-    return frame
-
-def save_image(image, path='captured_image.jpg'):
-    """Saves the image to a file."""
-    cv2.imwrite(path, image)
-
-def process_image_with_ocr(image_path):
-    """Processes the saved image with OCR to extract text."""
-    # Load the image with OpenCV
-    img = cv2.imread(image_path)
-
-    # Convert to grayscale for better OCR results
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Use pytesseract to perform OCR on the image
-    text = pytesseract.image_to_string(gray, config='--psm 6')
-    return text
-
-def extract_valid_text(text):
-    """Extracts valid text based on specific criteria."""
-    # Criteria: Uppercase letters and/or numbers, length between 3 and 10 characters
-    valid_texts = re.findall(r'\b[A-Z0-9]{3,10}\b', text)
-    return valid_texts
-
-def main():
-    image = capture_image()
-    if image is not None:
-        # Save captured image for processing
-        image_path = 'captured_image.jpg'
-        save_image(image, image_path)
+def capture_images(queue):
+    with PiCamera() as camera:
+        camera.resolution = (1024, 768)
+        time.sleep(2)  # Camera warm-up time
         
-        # Process image to extract text
-        text = process_image_with_ocr(image_path)
-        print("Extracted Text:", text)
+        for _ in range(10):  # Capture 10 images for demonstration
+            stream = io.BytesIO()
+            camera.capture(stream, format='jpeg')
+            stream.seek(0)
+            queue.put(stream.getvalue())  # Put image data into the queue
+            time.sleep(1)
+    
+    queue.put(None)  # Signal that capturing is done
+
+def process_images(queue):
+    while True:
+        image_data = queue.get()
+        if image_data is None:
+            break  # Stop if capturing is done
         
-        # Extract and print valid texts
-        valid_texts = extract_valid_text(text)
-        if valid_texts:
-            print("Valid Texts:", valid_texts)
-        else:
-            print("No valid texts found.")
-    else:
-        print("Failed to capture image.")
+        # Convert bytes to numpy array and then to OpenCV image
+        nparr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # Placeholder for processing logic
+        # Display the image for demonstration
+        cv2.imshow('Image', img)
+        cv2.waitKey(1000)  # Wait for 1 sec
+
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    main()
+    queue = Queue()
+
+    # Start the image capture process
+    capture_process = Process(target=capture_images, args=(queue,))
+    capture_process.start()
+
+    # Start the image processing process
+    process_process = Process(target=process_images, args=(queue,))
+    process_process.start()
+
+    # Wait for processes to finish
+    capture_process.join()
+    process_process.join()
