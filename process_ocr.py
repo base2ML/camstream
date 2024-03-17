@@ -1,76 +1,73 @@
-import os
-import csv
-from google.cloud import storage
-from PIL import Image
+import logging
+from multiprocessing import Pool
+from picamera import PiCamera
+from io import BytesIO
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
+import re
+import os
 
-def download_images_from_storage(bucket_name, destination_folder):
-    """Download all images from Google Cloud Storage to local folder."""
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    
-    # Create destination folder if it doesn't exist
-    if not os.path.exists(destination_folder):
-        os.makedirs(destination_folder)
-    
-    blobs = bucket.list_blobs()
-    for blob in blobs:
-        if blob.name.endswith('.jpg') or blob.name.endswith('.jpeg') or blob.name.endswith('.png'):
-            destination_file = os.path.join(destination_folder, os.path.basename(blob.name))
-            blob.download_to_filename(destination_file)
-            print(f"Downloaded {blob.name}")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def perform_ocr_on_images(image_folder, output_csv, dump_folder, confidence_threshold=0.85):
-    """Perform OCR on images and record results in CSV file."""
-    with open(output_csv, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(['Filename', 'Detected Text'])
+# Preprocessing options (easily tweakable)
+PREPROCESS_GRAYSCALE = True
+CONTRAST_ENHANCEMENT = 1.5  # Set to 1 for no enhancement
+SHARPNESS_ENHANCEMENT = 1.0  # Set to 1 for no enhancement
+
+# OCR function to process an image
+def process_image(image_data):
+    try:
+        image = Image.open(BytesIO(image_data))
         
-        for filename in os.listdir(image_folder):
-            if filename.endswith('.jpg') or filename.endswith('.jpeg') or filename.endswith('.png'):
-                image_path = os.path.join(image_folder, filename)
-                text = perform_ocr(image_path)
-                if text:
-                    confidence = 1.0  # Placeholder for confidence level (can be obtained from OCR library)
-                    if confidence >= confidence_threshold:
-                        csvwriter.writerow([filename, text])
-                    else:
-                        move_to_dump(image_path, dump_folder)
-                else:
-                    move_to_dump(image_path, dump_folder)
-
-def perform_ocr(image_path):
-    """Perform OCR on the given image and return detected text."""
-    try:
-        text = pytesseract.image_to_string(Image.open(image_path))
-        return text.strip()
+        # Preprocess the image
+        if PREPROCESS_GRAYSCALE:
+            image = image.convert('L')
+        if CONTRAST_ENHANCEMENT != 1:
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(CONTRAST_ENHANCEMENT)
+        if SHARPNESS_ENHANCEMENT != 1:
+            enhancer = ImageEnhance.Sharpness(image)
+            image = enhancer.enhance(SHARPNESS_ENHANCEMENT)
+        
+        text = pytesseract.image_to_string(image)
+        # Filter text based on your criteria
+        valid_texts = re.findall(r'\b[A-Z0-9]{3,10}\b', text)
+        return valid_texts
     except Exception as e:
-        print(f"Failed to perform OCR on {image_path}: {e}")
-        return None
+        logging.error(f"Error processing image: {e}")
+        return []
 
-def move_to_dump(image_path, dump_folder):
-    """Move the image file to the dump folder."""
-    try:
-        os.makedirs(dump_folder, exist_ok=True)
-        filename = os.path.basename(image_path)
-        new_path = os.path.join(dump_folder, filename)
-        os.rename(image_path, new_path)
-        print(f"Moved {filename} to dump folder")
-    except Exception as e:
-        print(f"Failed to move {image_path} to dump folder: {e}")
+# Function to take a picture and process it
+def capture_and_process(camera):
+    stream = BytesIO()
+    camera.capture(stream, format='jpeg')
+    stream.seek(0)
+    texts = process_image(stream.getvalue())
+    if texts:
+        logging.info(f"Found texts: {texts}")
+    else:
+        # No valid text found; option to delete the image here
+        logging.info("No valid text found in the image.")
 
+# Main function to setup camera and multiprocessing
 def main():
-    # Configuration
-    bucket_name = 'your_bucket_name'
-    destination_folder = 'downloaded_images'
-    output_csv = 'observations.csv'
-    dump_folder = 'dump'
-    
-    # Step 1: Download images from Google Cloud Storage
-    download_images_from_storage(bucket_name, destination_folder)
-    
-    # Step 2-4: Perform OCR on images and record results in CSV file
-    perform_ocr_on_images(destination_folder, output_csv, dump_folder)
+    camera = PiCamera()
+    camera.resolution = (1024, 768)
+
+    # Setup multiprocessing pool based on the number of cores
+    pool = Pool()  # Automatically uses all available cores
+
+    try:
+        while True:
+            # Using apply_async to not block the script while waiting for the process to finish
+            pool.apply_async(capture_and_process, args=(camera,))
+    except KeyboardInterrupt:
+        logging.info("Stopping by user request.")
+    finally:
+        pool.close()
+        pool.join()
+        camera.close()
 
 if __name__ == "__main__":
     main()
